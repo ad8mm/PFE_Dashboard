@@ -30,3 +30,10 @@
     ```
 
 ---
+
+## 2. Lancer l'app
+
+1. **Commande**
+    ```bash
+    streamlit run app.py
+    ```
