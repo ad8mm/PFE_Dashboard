@@ -1,0 +1,11 @@
+# Environnement virtuel Python
+venv/
+
+# Fichiers temporaires Python
+__pycache__/
+*.py[cod]
+
+# Autres fichiers potentiellement inutiles
+.DS_Store
+.ipynb_checkpoints/
+*.log

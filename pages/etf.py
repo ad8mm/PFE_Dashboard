@@ -1,6 +1,6 @@
 import streamlit as st
 import plotly.graph_objects as go
-from utils.data_loader import load_prices
+from data.utils.data_loader import load_prices
 
 st.title("📦 Suivi des ETF")
 
