@@ -1,0 +1,6 @@
+pandas
+yfinance
+pycoingecko
+datetime
+plotly
+streamlit
