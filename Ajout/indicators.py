@@ -1,10 +1,11 @@
 import yfinance as yf
 import ta
 import pandas as pd
+import numpy as np
 import streamlit as st
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -12,134 +13,254 @@ logger = logging.getLogger(__name__)
 
 class TechnicalAnalyzer:
     """Classe pour l'analyse technique des actifs financiers"""
-    
-    def __init__(self, rsi_overbought: int = 70, rsi_oversold: int = 30, 
+
+    def __init__(self, rsi_overbought: int = 70, rsi_oversold: int = 30,
                  sma_periods: tuple = (20, 50, 200), bollinger_period: int = 20):
-        """
-        Initialise l'analyseur technique avec des paramètres configurables
-        
-        Args:
-            rsi_overbought: Seuil RSI de surachat (défaut: 70)
-            rsi_oversold: Seuil RSI de survente (défaut: 30)
-            sma_periods: Périodes des moyennes mobiles (défaut: 20, 50, 200)
-            bollinger_period: Période des bandes de Bollinger (défaut: 20)
-        """
         self.rsi_overbought = rsi_overbought
         self.rsi_oversold = rsi_oversold
         self.sma_periods = sma_periods
         self.bollinger_period = bollinger_period
 
-    @st.cache_data(ttl=300)  # Cache pendant 5 minutes
-    def get_data(_self, ticker: str, period: str = "6mo") -> Optional[pd.DataFrame]:
-        """
-        Récupère les données financières avec gestion d'erreurs robuste
-        
-        Args:
-            ticker: Symbole de l'actif (ex: "AAPL", "BTC-USD")
-            period: Période de données (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
-            
-        Returns:
-            DataFrame avec les données OHLCV ou None si erreur
-        """
+    @st.cache_data(ttl=300)
+    def get_data(_self, ticker: str, period: str = "6mo", interval: str = "1d") -> Optional[pd.DataFrame]:
         try:
-            logger.info(f"Téléchargement des données pour {ticker} sur {period}")
-            
-            # Téléchargement des données
-            df = yf.download(ticker, period=period, progress=False)
-            
+            logger.info(f"Téléchargement des données pour {ticker} sur {period} avec intervalle {interval}")
+            df = yf.download(ticker, period=period, interval=interval, progress=False, group_by="ticker")
+            if isinstance(df.columns, pd.MultiIndex):
+                if ticker in df.columns.get_level_values(0):
+                    df = df[ticker]
+                    df.columns.name = None
+
+            print("Colonnes après flatten :", df.columns)
             if df.empty:
                 st.error(f"❌ Aucune donnée trouvée pour le ticker **{ticker}**")
                 return None
-            
-            # Nettoyage des données
+
             df.dropna(inplace=True)
-            
-            # Vérification qu'il reste suffisamment de données
-            min_required = max(_self.sma_periods) + 50  # Marge de sécurité
+            min_required = max(_self.sma_periods) + 50
             if len(df) < min_required:
-                st.warning(f"⚠️ Données insuffisantes pour {ticker} ({len(df)} points). "
-                          f"Minimum requis: {min_required}")
+                st.warning(f"⚠️ Données insuffisantes pour {ticker} ({len(df)} points). Minimum requis: {min_required}")
                 return None
-            
+
             logger.info(f"Données récupérées avec succès: {len(df)} points")
             return df
-            
+
         except Exception as e:
             logger.error(f"Erreur lors du téléchargement de {ticker}: {e}")
             st.error(f"❌ Erreur lors du téléchargement des données pour **{ticker}**: {str(e)}")
             return None
 
     def add_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Ajoute tous les indicateurs techniques au DataFrame
-        
-        Args:
-            df: DataFrame avec les données OHLCV
-            
-        Returns:
-            DataFrame enrichi avec les indicateurs
-        """
         try:
             df_copy = df.copy()
-            
-            # Moyennes mobiles simples
+            for col in ['Close', 'High', 'Low', 'Volume']:
+                if col in df_copy.columns:
+                    val = df_copy[col]
+                    if isinstance(val, pd.DataFrame) or isinstance(val.values[0], (list, np.ndarray)):
+                        df_copy[col] = df_copy[col].squeeze()
+
+            print("Types finaux :", {col: type(df_copy[col]) for col in ['Close', 'High', 'Low', 'Volume'] if col in df_copy.columns})
+            print("Shapes finaux :", {col: df_copy[col].shape for col in ['Close', 'High', 'Low', 'Volume'] if col in df_copy.columns})
+
             for period in self.sma_periods:
                 if len(df_copy) >= period:
                     df_copy[f'SMA{period}'] = df_copy['Close'].rolling(period).mean()
                 else:
                     logger.warning(f"Pas assez de données pour SMA{period}")
-            
-            # Bandes de Bollinger
+
             if len(df_copy) >= self.bollinger_period:
-                bb = ta.volatility.BollingerBands(
-                    close=df_copy['Close'], 
-                    window=self.bollinger_period, 
-                    window_dev=2
-                )
+                bb = ta.volatility.BollingerBands(close=df_copy['Close'], window=self.bollinger_period, window_dev=2)
                 df_copy['Bollinger_High'] = bb.bollinger_hband()
                 df_copy['Bollinger_Low'] = bb.bollinger_lband()
                 df_copy['Bollinger_Mid'] = bb.bollinger_mavg()
-            
-            # RSI
-            if len(df_copy) >= 14:  # RSI nécessite au moins 14 périodes
+
+            if len(df_copy) >= 14:
                 df_copy['RSI'] = ta.momentum.RSIIndicator(close=df_copy['Close']).rsi()
-            
-            # MACD
-            if len(df_copy) >= 26:  # MACD nécessite au moins 26 périodes
+
+            if len(df_copy) >= 26:
                 macd = ta.trend.MACD(close=df_copy['Close'])
                 df_copy['MACD'] = macd.macd()
                 df_copy['MACD_Signal'] = macd.macd_signal()
                 df_copy['MACD_Histogram'] = macd.macd_diff()
-            
-            # Stochastique
+
             if len(df_copy) >= 14:
                 stoch = ta.momentum.StochasticOscillator(
-                    high=df_copy['High'], 
-                    low=df_copy['Low'], 
+                    high=df_copy['High'],
+                    low=df_copy['Low'],
                     close=df_copy['Close']
                 )
                 df_copy['Stoch_K'] = stoch.stoch()
                 df_copy['Stoch_D'] = stoch.stoch_signal()
-            
-            # ATR (Average True Range) - pour la volatilité
+
             if len(df_copy) >= 14:
                 df_copy['ATR'] = ta.volatility.AverageTrueRange(
-                    high=df_copy['High'], 
-                    low=df_copy['Low'], 
+                    high=df_copy['High'],
+                    low=df_copy['Low'],
                     close=df_copy['Close']
                 ).average_true_range()
-            
-            # Volume SMA pour analyse du volume
+
             if 'Volume' in df_copy.columns and len(df_copy) >= 20:
                 df_copy['Volume_SMA20'] = df_copy['Volume'].rolling(20).mean()
-            
+
             logger.info("Indicateurs techniques calculés avec succès")
             return df_copy
-            
+
         except Exception as e:
             logger.error(f"Erreur lors du calcul des indicateurs: {e}")
             st.error(f"❌ Erreur lors du calcul des indicateurs: {str(e)}")
             return df
+
+    def display_signals(self, signals: Dict[str, str]):
+        """
+        Affiche les signaux avec couleurs (vert pour acheter, rouge pour vendre, bleu pour confirmer)
+        """
+        for key, value in signals.items():
+            color = None
+            if 'Acheter' in value:
+                color = 'green'
+            elif 'Vendre' in value:
+                color = 'red'
+            elif 'Confirme' in value:
+                color = 'blue'
+            elif 'Neutre' in value:
+                color = 'gray'
+
+            if color:
+                st.markdown(f"**{key}** : <span style='color:{color}'>{value}</span>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"**{key}** : {value}", unsafe_allow_html=True)
+import yfinance as yf
+import ta
+import pandas as pd
+import numpy as np
+import streamlit as st
+import logging
+from typing import Optional, Dict, Any
+from datetime import datetime, timedelta
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class TechnicalAnalyzer:
+    """Classe pour l'analyse technique des actifs financiers"""
+
+    def __init__(self, rsi_overbought: int = 70, rsi_oversold: int = 30,
+                 sma_periods: tuple = (20, 50, 200), bollinger_period: int = 20):
+        self.rsi_overbought = rsi_overbought
+        self.rsi_oversold = rsi_oversold
+        self.sma_periods = sma_periods
+        self.bollinger_period = bollinger_period
+
+    @st.cache_data(ttl=300)
+    def get_data(_self, ticker: str, period: str = "6mo", interval: str = "1d") -> Optional[pd.DataFrame]:
+        try:
+            logger.info(f"Téléchargement des données pour {ticker} sur {period} avec intervalle {interval}")
+            df = yf.download(ticker, period=period, interval=interval, progress=False, group_by="ticker")
+            if isinstance(df.columns, pd.MultiIndex):
+                if ticker in df.columns.get_level_values(0):
+                    df = df[ticker]
+                    df.columns.name = None
+
+            print("Colonnes après flatten :", df.columns)
+            if df.empty:
+                st.error(f"❌ Aucune donnée trouvée pour le ticker **{ticker}**")
+                return None
+
+            df.dropna(inplace=True)
+            min_required = max(_self.sma_periods) + 50
+            if len(df) < min_required:
+                st.warning(f"⚠️ Données insuffisantes pour {ticker} ({len(df)} points). Minimum requis: {min_required}")
+                return None
+
+            logger.info(f"Données récupérées avec succès: {len(df)} points")
+            return df
+
+        except Exception as e:
+            logger.error(f"Erreur lors du téléchargement de {ticker}: {e}")
+            st.error(f"❌ Erreur lors du téléchargement des données pour **{ticker}**: {str(e)}")
+            return None
+
+    def add_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        try:
+            df_copy = df.copy()
+            for col in ['Close', 'High', 'Low', 'Volume']:
+                if col in df_copy.columns:
+                    val = df_copy[col]
+                    if isinstance(val, pd.DataFrame) or isinstance(val.values[0], (list, np.ndarray)):
+                        df_copy[col] = df_copy[col].squeeze()
+
+            print("Types finaux :", {col: type(df_copy[col]) for col in ['Close', 'High', 'Low', 'Volume'] if col in df_copy.columns})
+            print("Shapes finaux :", {col: df_copy[col].shape for col in ['Close', 'High', 'Low', 'Volume'] if col in df_copy.columns})
+
+            for period in self.sma_periods:
+                if len(df_copy) >= period:
+                    df_copy[f'SMA{period}'] = df_copy['Close'].rolling(period).mean()
+                else:
+                    logger.warning(f"Pas assez de données pour SMA{period}")
+
+            if len(df_copy) >= self.bollinger_period:
+                bb = ta.volatility.BollingerBands(close=df_copy['Close'], window=self.bollinger_period, window_dev=2)
+                df_copy['Bollinger_High'] = bb.bollinger_hband()
+                df_copy['Bollinger_Low'] = bb.bollinger_lband()
+                df_copy['Bollinger_Mid'] = bb.bollinger_mavg()
+
+            if len(df_copy) >= 14:
+                df_copy['RSI'] = ta.momentum.RSIIndicator(close=df_copy['Close']).rsi()
+
+            if len(df_copy) >= 26:
+                macd = ta.trend.MACD(close=df_copy['Close'])
+                df_copy['MACD'] = macd.macd()
+                df_copy['MACD_Signal'] = macd.macd_signal()
+                df_copy['MACD_Histogram'] = macd.macd_diff()
+
+            if len(df_copy) >= 14:
+                stoch = ta.momentum.StochasticOscillator(
+                    high=df_copy['High'],
+                    low=df_copy['Low'],
+                    close=df_copy['Close']
+                )
+                df_copy['Stoch_K'] = stoch.stoch()
+                df_copy['Stoch_D'] = stoch.stoch_signal()
+
+            if len(df_copy) >= 14:
+                df_copy['ATR'] = ta.volatility.AverageTrueRange(
+                    high=df_copy['High'],
+                    low=df_copy['Low'],
+                    close=df_copy['Close']
+                ).average_true_range()
+
+            if 'Volume' in df_copy.columns and len(df_copy) >= 20:
+                df_copy['Volume_SMA20'] = df_copy['Volume'].rolling(20).mean()
+
+            logger.info("Indicateurs techniques calculés avec succès")
+            return df_copy
+
+        except Exception as e:
+            logger.error(f"Erreur lors du calcul des indicateurs: {e}")
+            st.error(f"❌ Erreur lors du calcul des indicateurs: {str(e)}")
+            return df
+
+    def display_signals(self, signals: Dict[str, str]):
+        """
+        Affiche les signaux avec couleurs (vert pour acheter, rouge pour vendre, bleu pour confirmer)
+        """
+        for key, value in signals.items():
+            color = None
+            if 'Acheter' in value:
+                color = 'green'
+            elif 'Vendre' in value:
+                color = 'red'
+            elif 'Confirme' in value:
+                color = 'blue'
+            elif 'Neutre' in value:
+                color = 'gray'
+
+            if color:
+                st.markdown(f"**{key}** : <span style='color:{color}'>{value}</span>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"**{key}** : {value}", unsafe_allow_html=True)
+
 
     def interpret_indicators(self, df: pd.DataFrame) -> Dict[str, str]:
         """
@@ -323,7 +444,7 @@ class TechnicalAnalyzer:
                         weighted_score += weights['Volume'] * 0.5
                     elif weighted_score < 0:
                         weighted_score -= weights['Volume'] * 0.5
-                    signals['Volume'] = 'Confirme'
+                    signals['Volume'] = 'Confirme la tendance'
                 else:
                     signals['Volume'] = 'Neutre'
                 total_weight += weights['Volume']
@@ -394,12 +515,10 @@ class TechnicalAnalyzer:
 
 # Fonctions d'utilité pour la compatibilité avec l'ancien code
 def get_data(ticker: str, period: str = "6mo") -> Optional[pd.DataFrame]:
-    """Fonction wrapper pour compatibilité"""
     analyzer = TechnicalAnalyzer()
     return analyzer.get_data(ticker, period)
 
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Fonction wrapper pour compatibilité"""
     analyzer = TechnicalAnalyzer()
     return analyzer.add_indicators(df)
 
@@ -414,25 +533,25 @@ def generate_signals(df: pd.DataFrame) -> Dict[str, Any]:
     return analyzer.generate_signals(df)
 
 
-# Exemple d'utilisation
-if __name__ == "__main__":
-    # Créer un analyseur avec paramètres personnalisés
-    analyzer = TechnicalAnalyzer(rsi_overbought=75, rsi_oversold=25)
+# # Exemple d'utilisation
+# if __name__ == "__main__":
+#     # Créer un analyseur avec paramètres personnalisés
+#     analyzer = TechnicalAnalyzer(rsi_overbought=75, rsi_oversold=25)
     
-    # Analyser un actif
-    ticker = "AAPL"
-    df = analyzer.get_data(ticker, "6mo")
+#     # Analyser un actif
+#     ticker = "AAPL"
+#     df = analyzer.get_data(ticker, "6mo")
     
-    if df is not None:
-        df_with_indicators = analyzer.add_indicators(df)
-        interpretations = analyzer.interpret_indicators(df_with_indicators)
-        signals = analyzer.generate_signals(df_with_indicators)
+#     if df is not None:
+#         df_with_indicators = analyzer.add_indicators(df)
+#         interpretations = analyzer.interpret_indicators(df_with_indicators)
+#         signals = analyzer.generate_signals(df_with_indicators)
         
-        print(f"Analyse pour {ticker}:")
-        print("\nInterprétations:")
-        for key, value in interpretations.items():
-            print(f"  {key}: {value}")
+#         print(f"Analyse pour {ticker}:")
+#         print("\nInterprétations:")
+#         for key, value in interpretations.items():
+#             print(f"  {key}: {value}")
         
-        print("\nSignaux:")
-        for key, value in signals.items():
-            print(f"  {key}: {value}")
+#         print("\nSignaux:")
+#         for key, value in signals.items():
+#             print(f"  {key}: {value}")

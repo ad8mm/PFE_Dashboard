@@ -3,3 +3,7 @@ yfinance
 pycoingecko
 plotly
 streamlit
+ta
+numpy
+transformers
+tensorflow

@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from data.utils.data_loader import load_prices
+from Ajout.technical_section import afficher_indicateurs
 
 st.title("📦 Suivi des ETF")
 
@@ -16,5 +17,10 @@ if selection:
 
     fig.update_layout(title="Historique des Prix ETF", xaxis_title="Date", yaxis_title="Prix (USD)")
     st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+    for ticker in selection:
+        st.subheader(f"📊 Analyse Technique - {ticker}")
+        afficher_indicateurs(ticker)
 else:
     st.info("Veuillez sélectionner au moins un ETF.")
