@@ -83,8 +83,8 @@ if selection:
         st.markdown(sentiment_global)
 
         # Résumé synthétique
-        resume = analyzer.summarize_articles(news_df)
-        st.markdown(resume)
+        # resume = analyzer.summarize_articles(news_df)
+        # st.markdown(resume)
         
         # Détails des actualités
         analyzer.display_news(news_df.to_dict(orient="records"))

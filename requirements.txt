@@ -1,9 +1,19 @@
-pandas
-yfinance
-pycoingecko
-plotly
-streamlit
-ta
-numpy
-transformers
-tensorflow
+# Data
+pandas==2.2.2
+numpy==1.26.4
+yfinance==0.2.38
+pycoingecko==3.1.0
+
+# Visualization
+plotly==5.22.0
+streamlit==1.35.0
+
+# TA indicators
+ta==0.10.2
+
+# Transformers sans TensorFlow
+transformers==4.40.1
+torch==2.2.2
+
+# Pas besoin de tensorflow, il fait tout buguer
+# tensorflow  # ❌ À NE PAS INSTALLER
