@@ -2,8 +2,8 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.graph_objects as go
-from Ajout.technical_section import afficher_indicateurs
-from Ajout.indicators import TechnicalAnalyzer
+from technical_indicators.technical_section import afficher_indicateurs
+from technical_indicators.indicators import TechnicalAnalyzer
 from News_analyzer.news_analyzer import NewsSentimentAnalyzer
 
 # Fonction de récupération OHLC depuis Yahoo Finance
