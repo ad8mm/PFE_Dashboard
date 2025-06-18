@@ -1,11 +1,29 @@
 # Environnement virtuel Python
 venv/
+venvpfe/
+.venv/
+env/
+ENV/
 
-# Fichiers temporaires Python
+# Fichiers compilés Python
 __pycache__/
 *.py[cod]
+*.so
 
-# Autres fichiers potentiellement inutiles
-.DS_Store
-.ipynb_checkpoints/
+# Fichiers logs & temporaires
 *.log
+*.tmp
+*.bak
+
+# Jupyter & notebooks
+.ipynb_checkpoints/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Dossiers VS Code
+.vscode/
+
+# Clés sensibles
+*.key
