@@ -100,9 +100,9 @@ with st.expander("📰 Actualités & Sentiment", expanded=True):
     news_analyzer = NewsSentimentAnalyzer(api_key=api_key)
 
     search_term = selected_ticker
-    news_df = news_analyzer.analyze_sentiment(
-        news_analyzer.get_news(search_term, page_size=100)
-    )
+    articles = news_analyzer.get_news(search_term, page_size=100)
+    news_df = news_analyzer.analyze_sentiment(articles, search_term)
+
 
     st.subheader("🧭 Sentiment du marché")
     st.markdown(news_analyzer.compute_market_sentiment(news_df))
