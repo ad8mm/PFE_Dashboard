@@ -11,9 +11,17 @@ streamlit==1.35.0
 # TA indicators
 ta==0.10.2
 
-# Transformers sans TensorFlow
+# Transformers pour analyse de sentiment
 transformers==4.40.1
 torch==2.2.2
 
-# Pas besoin de tensorflow, il fait tout buguer
-# tensorflow  # ❌ À NE PAS INSTALLER
+# Cryptographie sécurisée
+cryptography==41.0.3
+
+# API REST Binance
+aiohttp==3.8.6
+requests==2.31.0  # ⚠️ éviter 2.32.4 (encore instable pour certains wrappers)
+
+# Compatibilité Streamlit
+packaging==24.0
+tenacity==8.2.3

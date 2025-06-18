@@ -6,6 +6,41 @@ from transformers import pipeline
 import streamlit as st
 import pandas as pd
 
+# Dictionnaire pour améliorer la qualité des requêtes de recherche
+TICKER_TO_QUERY = {
+    "BTC-USD": "Bitcoin",
+    "ETH-USD": "Ethereum",
+    "USDT-USD": "Tether",
+    "BNB-USD": "Binance Coin",
+    "SOL-USD": "Solana",
+    "XRP-USD": "Ripple",
+    "USDC-USD": "USD Coin",
+    "DOGE-USD": "Dogecoin",
+    "ADA-USD": "Cardano",
+    "AVAX-USD": "Avalanche"
+}
+
+# RELEVANT_KEYWORDS = [
+#     "crypto", "bitcoin", "ethereum", "blockchain", "token",
+#     "web3", "wallet", "exchange", "coin", "altcoin"
+# ]
+
+# RELEVANT_SOURCES = [
+#     "coindesk.com", "cointelegraph.com", "decrypt.co", "bitcoin.com",
+#     "beincrypto.com", "theblock.co", "blockworks.co", "bitcoinmagazine.com",
+#     "coingape.com", "u.today"
+# ]
+
+# # Remplacez RELEVANT_SOURCES (liste de domaines) par :
+# RELEVANT_DOMAINS = "coindesk.com,cointelegraph.com,decrypt.co,bitcoin.com,beincrypto.com,theblock.co,blockworks.co,bitcoinmagazine.com,coingape.com,u.today"
+
+
+
+# def is_relevant_article(article: dict) -> bool:
+#     content = f"{article.get('title', '')} {article.get('description', '')}".lower()
+#     return sum(kw in content for kw in RELEVANT_KEYWORDS) >= 2
+
+
 class NewsSentimentAnalyzer:
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -13,10 +48,12 @@ class NewsSentimentAnalyzer:
         self.sentiment_pipeline = pipeline(
             "sentiment-analysis",
             model="distilbert-base-uncased-finetuned-sst-2-english",
-            framework="pt"  # on force PyTorch
+            framework="pt"
         )
 
-    def get_news(self, query: str, language="fr", page_size=10):
+    def get_news(self, ticker: str, language="fr", page_size=10):
+        query = TICKER_TO_QUERY.get(ticker.upper(), ticker)
+        # sources_param = ",".join(RELEVANT_SOURCES)
         response = requests.get(
             self.endpoint,
             params={
@@ -36,10 +73,18 @@ class NewsSentimentAnalyzer:
     def analyze_sentiment(self, articles):
         results = []
         for article in articles:
+            # if not is_relevant_article(article):
+            #     continue
             text = f"{article['title']} {article.get('description', '')}"[:512]
             try:
                 sentiment = self.sentiment_pipeline(text)[0]
-                article["sentiment"] = "POS" if sentiment["label"] == "POSITIVE" else "NEG"
+                if sentiment["score"] >= 0.7:
+                    article["sentiment"] = "POS"
+                elif sentiment["score"] <= 0.3:
+                    article["sentiment"] = "NEG"
+                else:
+                    article["sentiment"] = "NEUTRAL"
+
                 article["sentiment_score"] = sentiment["score"]
             except Exception:
                 article["sentiment"] = "NEUTRAL"
@@ -50,13 +95,20 @@ class NewsSentimentAnalyzer:
     def compute_market_sentiment(self, df: pd.DataFrame) -> str:
         if df.empty:
             return "Aucune donnée"
-        avg = df["sentiment_score"].mean()
-        if avg >= 0.6:
-            return f"🟢 Sentiment global : Positif ({avg:.2f})"
-        elif avg <= 0.4:
-            return f"🔴 Sentiment global : Négatif ({avg:.2f})"
+
+        avg_score = df["sentiment_score"].mean()
+        count_pos = (df["sentiment"] == "POS").sum()
+        count_neg = (df["sentiment"] == "NEG").sum()
+        count_neu = (df["sentiment"] == "NEUTRAL").sum()
+        total = len(df)
+
+        if count_pos / total > 0.5:
+            return f"🟢 Sentiment global : Positif ({avg_score:.2f})"
+        elif count_neg / total > 0.5:
+            return f"🔴 Sentiment global : Négatif ({avg_score:.2f})"
         else:
-            return f"🟡 Sentiment global : Neutre ({avg:.2f})"
+            return f"🟡 Sentiment global : Mitigé ({avg_score:.2f})"
+
 
     def display_news(self, articles):
         for article in articles[:5]:
