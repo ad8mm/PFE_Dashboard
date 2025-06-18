@@ -1,7 +1,7 @@
-import streamlit as st
+import streamlit as st # type: ignore
 import requests
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.graph_objects as go # type: ignore
 from technical_indicators.technical_section import afficher_indicateurs
 from technical_indicators.indicators import TechnicalAnalyzer
 from News_analyzer.news_analyzer import NewsSentimentAnalyzer

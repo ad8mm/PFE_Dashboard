@@ -5,6 +5,8 @@ import requests
 from transformers import pipeline
 import streamlit as st
 import pandas as pd
+import re
+
 
 # Dictionnaire pour améliorer la qualité des requêtes de recherche
 TICKER_TO_QUERY = {
@@ -46,6 +48,109 @@ CRYPTO_TICKERS = {
 
 BLACKLIST_KEYWORDS = ["photography", "gaming", "travel", "recipe", "nintendo", "iphone"]
 
+POSITIVE_KEYWORDS = {
+    "acquired": +0.05,
+    "acquires": +0.05,
+    "acquisition": +0.05,
+    "buy": +0.04,
+    "buys": +0.04,
+    "tops": +0.04,
+    "purchases": +0.04,
+    "added": +0.03,
+    "adds": +0.03,
+    "increased": +0.04,
+    "raises": +0.04,
+    "boost": +0.05,
+    "growth": +0.05,
+    "rally": +0.04,
+    "surge": +0.05,
+    "bullish": +0.06,
+    "breakout": +0.04,
+    "uptrend": +0.04,
+    "adoption": +0.05,
+    "partnership": +0.05,
+    "collaboration": +0.04,
+    "approved": +0.05,
+    "approval": +0.05,
+    "launch": +0.04,
+    "success": +0.05,
+    "successful": +0.05,
+    "profit": +0.04,
+    "record high": +0.06,
+    "new high": +0.05,
+    "all-time high": +0.06,
+    "invest": +0.04,
+    "investing": +0.04,
+    "support": +0.03,
+    "expansion": +0.04,
+    "innovation": +0.04,
+    "upgrade": +0.03,
+    "recovery": +0.03,
+    "rebound": +0.04,
+    "positive": +0.03,
+    "gains": +0.03,
+    "beats expectations": +0.05,
+    "outperforms": +0.04
+}
+
+
+NEGATIVE_KEYWORDS = {
+    "cut": -0.07,
+    "cuts": -0.07,
+    "sold": -0.05,
+    "sell": -0.05,
+    "sells": -0.05,
+    "selling": -0.05,
+    "reduces": -0.05,
+    "reduced": -0.05,
+    "dropped": -0.06,
+    "drop": -0.05,
+    "plunge": -0.07,
+    "slump": -0.06,
+    "bearish": -0.06,
+    "falls":-0.06,
+    "downtrend": -0.05,
+    "crash": -0.08,
+    "decline": -0.05,
+    "declined": -0.05,
+    "loss": -0.05,
+    "losses": -0.05,
+    "missed expectations": -0.06,
+    "underperforms": -0.05,
+    "resigned": -0.04,
+    "lawsuit": -0.05,
+    "hack": -0.06,
+    "hacked": -0.06,
+    "scam": -0.07,
+    "regulatory scrutiny": -0.06,
+    "banned": -0.07,
+    "ban": -0.06,
+    "warning": -0.04,
+    "fined": -0.06,
+    "penalty": -0.05,
+    "collapse": -0.07,
+    "down": -0.03,
+    "negative": -0.03,
+    "shutdown": -0.06,
+    "layoff": -0.05,
+    "delisted": -0.06,
+    "recession": -0.05,
+    "withdraw": -0.04,
+    "withdrawal": -0.04,
+    "rejected": -0.05,
+    "failed": -0.06,
+    "failure": -0.06,
+    "fraud": -0.07,
+    "suspension": -0.05,
+    "lowers": -0.05,
+    "embarassing":-0.05,
+    "bad": -0.05,
+    "bankruptcy": -0.08,
+    "bankrupt": -0.08,
+}
+
+
+
 def is_blacklisted(article: dict):
     content = f"{article.get('title', '')} {article.get('description', '')}".lower()
     return any(bad in content for bad in BLACKLIST_KEYWORDS)
@@ -54,14 +159,38 @@ def is_relevant_article(article: dict, ticker: str, keywords: list[str]) -> bool
     content = f"{article.get('title', '')} {article.get('description', '')}".lower()
     return any(kw.lower() in content for kw in [ticker.lower()] + [k.lower() for k in keywords])
 
+def adjust_sentiment_score(text: str, original_score: float) -> float:
+        score = original_score
+        text_lower = text.lower()
+        for word, boost in POSITIVE_KEYWORDS.items():
+            if word in text_lower:
+                score += boost
+        for word, penalty in NEGATIVE_KEYWORDS.items():
+            if word in text_lower:
+                score += penalty
+        return max(0.0, min(1.0, score))  # s'assurer que le score reste entre 0 et 1
+
+from typing import Optional
+
+def force_label_from_title(title: str) -> Optional[str]:
+    title_lower = title.lower()
+    for word in NEGATIVE_KEYWORDS:
+        if word in title_lower:
+            return "NEG"
+    for word in POSITIVE_KEYWORDS:
+        if word in title_lower:
+            return "POS"
+    return None
+
+
 class NewsSentimentAnalyzer:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.endpoint = "https://newsapi.org/v2/everything"
         self.sentiment_pipeline = pipeline(
             "sentiment-analysis",
-            model="distilbert-base-uncased-finetuned-sst-2-english",
-            framework="pt"
+            model="ProsusAI/finbert",
+            tokenizer="ProsusAI/finbert"
         )
 
     def get_news(self, ticker: str, page_size=15):
@@ -100,21 +229,35 @@ class NewsSentimentAnalyzer:
                 continue
 
             text = f"{article['title']} {article.get('description', '')}"[:512]
-            try:
-                sentiment = self.sentiment_pipeline(text)[0]
-                if sentiment["score"] >= 0.7:
-                    article["sentiment"] = "POS"
-                elif sentiment["score"] <= 0.3:
-                    article["sentiment"] = "NEG"
-                else:
-                    article["sentiment"] = "NEUTRAL"
+            title = article.get("title", "")
 
-                article["sentiment_score"] = sentiment["score"]
-            except Exception:
-                article["sentiment"] = "NEUTRAL"
-                article["sentiment_score"] = 0.5
+            forced_label = force_label_from_title(title)
+
+            if forced_label:
+                article["sentiment"] = forced_label
+                article["sentiment_score"] = 0.8 if forced_label == "POS" else 0.2
+            else:
+                try:
+                    sentiment = self.sentiment_pipeline(text)[0]
+                    adjusted_score = adjust_sentiment_score(text, sentiment["score"])
+
+                    if adjusted_score >= 0.7:
+                        label = "POS"
+                    elif adjusted_score <= 0.3:
+                        label = "NEG"
+                    else:
+                        label = "NEUTRAL"
+
+                    article["sentiment"] = label
+                    article["sentiment_score"] = adjusted_score
+                except Exception:
+                    article["sentiment"] = "NEUTRAL"
+                    article["sentiment_score"] = 0.5
+
             results.append(article)
         return pd.DataFrame(results)
+
+
 
     def compute_market_sentiment(self, df: pd.DataFrame) -> str:
         if df.empty:
