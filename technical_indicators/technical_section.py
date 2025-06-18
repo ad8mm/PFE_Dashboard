@@ -1,5 +1,5 @@
 import streamlit as st
-from Ajout.indicators import TechnicalAnalyzer
+from technical_indicators.indicators import TechnicalAnalyzer
 
 def afficher_indicateurs(ticker: str, period: str = "1y", interval: str = "1d"):
     st.markdown("## 🔍 Analyse Technique")
