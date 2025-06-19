@@ -12,6 +12,14 @@ from datetime import datetime, timedelta
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def is_valid_yahoo_data(data):
+    try:
+        _ = data["chart"]["result"][0]["timestamp"]
+        return True
+    except Exception:
+        return False
+
+
 class TechnicalAnalyzer:
     """Classe pour l'analyse technique des actifs financiers"""
 
@@ -26,20 +34,23 @@ class TechnicalAnalyzer:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range={range_}&interval={interval}"
         headers = {"User-Agent": "Mozilla/5.0"}
         r = requests.get(url, headers=headers)
+        
         if r.status_code != 200:
-            st.error(f"Erreur HTTP {r.status_code} pour {ticker}")
             return None
+
         data = r.json()
+        if not is_valid_yahoo_data(data):
+            return None
+
         try:
             timestamps = data["chart"]["result"][0]["timestamp"]
             ohlc = data["chart"]["result"][0]["indicators"]["quote"][0]
-            df = pd.DataFrame(ohlc, index=pd.to_datetime(timestamps, unit="s"))
+            df = pd.DataFrame(ohlc, index=pd.to_datetime(timestamps, unit="s", utc=True))
             df.dropna(inplace=True)
             return df
-        except Exception as e:
-            logger.error(f"Erreur parsing données Yahoo : {e}")
-            st.error(f"Erreur parsing données Yahoo : {str(e)}")
+        except Exception:
             return None
+
 
     def get_data(self, ticker: str, period: str = "6mo", interval: str = "1d") -> Optional[pd.DataFrame]:
         logger.info(f"Téléchargement des données pour {ticker} via Yahoo avec {period}, intervalle {interval}")

@@ -25,3 +25,5 @@ requests==2.31.0  # ⚠️ éviter 2.32.4 (encore instable pour certains wrapper
 # Compatibilité Streamlit
 packaging==24.0
 tenacity==8.2.3
+
+scipy

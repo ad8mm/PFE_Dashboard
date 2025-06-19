@@ -147,6 +147,13 @@ NEGATIVE_KEYWORDS = {
     "bad": -0.05,
     "bankruptcy": -0.08,
     "bankrupt": -0.08,
+    "halts": -0.05,
+    "plummets": -0.07,
+    "plummeted": -0.07,
+    "plummeting": -0.07,
+    "at risk": -0.05,
+    "exod": -0.05,
+    "exodus": -0.05,
 }
 
 
