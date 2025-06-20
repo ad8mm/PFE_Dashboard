@@ -32,20 +32,24 @@ TICKER_TO_QUERY = {
     "PYPL": "PayPal"
 }
 
+# Liste des domaines pertinents pour les actualités
 RELEVANT_DOMAINS = (
     "coindesk.com,cointelegraph.com,decrypt.co,bitcoin.com,"
     "beincrypto.com,theblock.co,blockworks.co,bitcoinmagazine.com,"
     "coingape.com,u.today"
 )
 
+# Sources d'actualités pour crypto et actions
 CRYPTO_SOURCES = "coindesk.com,cointelegraph.com,decrypt.co,bitcoinmagazine.com"
 STOCK_SOURCES = "bloomberg.com,cnbc.com,reuters.com,finance.yahoo.com"
 
+# Tickers crypto pour filtrage
 CRYPTO_TICKERS = {
     "BTC-USD", "ETH-USD", "USDT-USD", "BNB-USD", "SOL-USD",
     "XRP-USD", "USDC-USD", "DOGE-USD", "ADA-USD", "AVAX-USD"
 }
 
+# Mots-clés à exclure des résultats
 BLACKLIST_KEYWORDS = ["photography", "gaming", "travel", "recipe", "nintendo", "iphone"]
 
 POSITIVE_KEYWORDS = {
@@ -271,8 +275,8 @@ class NewsSentimentAnalyzer:
             return "Aucune donnée"
 
         avg_score = df["sentiment_score"].mean()
-        count_pos = (df["sentiment"] == "POS").sum()
-        count_neg = (df["sentiment"] == "NEG").sum()
+        count_pos = (df["sentiment"] == "POS").sum() 
+        count_neg = (df["sentiment"] == "NEG").sum() 
         count_neu = (df["sentiment"] == "NEUTRAL").sum()
         total = len(df)
 

@@ -106,11 +106,31 @@ if submitted:
 
         total_value = df_assets["Valeur ($)"].sum()
 
-        st.metric("💰 Valeur totale du portefeuille ($)", f"{total_value:,.2f} $")
-        st.dataframe(df_assets, use_container_width=True)
+        col1, col2 = st.columns([1, 2])  # 1/3 - 2/3 de l'espace (ajustable)
 
-        fig = px.pie(df_assets, names="Coin", values="Valeur ($)", title="Répartition du portefeuille")
-        st.plotly_chart(fig, use_container_width=True)
+        with col1:
+            st.markdown(
+                f"""
+                <div style='text-align: center;'>
+                    <h3>💰 Valeur totale du portefeuille ($)</h3>
+                    <h1 style='font-size: 48px; margin-top: 0;'>{total_value:,.2f} $</h1>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            df_assets["% du portefeuille"] = df_assets["Valeur ($)"] / total_value * 100
+            fig = px.bar(df_assets.sort_values("Valeur ($)", ascending=True),
+                        x="Valeur ($)", y="Coin", orientation="h",
+                        title="📊 Répartition du portefeuille (USD)")
+            st.plotly_chart(fig, use_container_width=True)
+
+
+        with col2:
+            fig = px.pie(df_assets, names="Coin", values="Valeur ($)", title="Répartition du portefeuille")
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.dataframe(df_assets, use_container_width=True)
 
     except Exception as e:
         st.error(f"❌ Erreur : {e}")
