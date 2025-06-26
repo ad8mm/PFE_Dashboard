@@ -154,7 +154,7 @@ for ticker in TICKERS:
                 st.warning(f"Erreur sur {ticker} ({tf_name}) : {e}")
 
 if bollinger_alerts_total:
-    st.subheader("📉 Alertes Bandes de Bollinger")
+    st.subheader("📉 Alertes Bulles de Bollinger")
     df_boll = pd.DataFrame(bollinger_alerts_total)
     df_boll["Sort"] = pd.to_datetime(df_boll["Date"].str[:16], errors='coerce')
     df_boll = df_boll.sort_values("Sort", ascending=False).drop(columns=["Sort"])

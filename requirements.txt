@@ -20,7 +20,7 @@ cryptography==41.0.3
 
 # API REST Binance
 aiohttp==3.8.6
-requests==2.31.0  # ⚠️ éviter 2.32.4 (encore instable pour certains wrappers)
+requests==2.31.0  # éviter 2.32.4 (encore instable pour certains wrappers)
 
 # Compatibilité Streamlit
 packaging==24.0

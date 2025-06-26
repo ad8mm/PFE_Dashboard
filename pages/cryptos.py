@@ -47,7 +47,7 @@ st.title("🪙 Suivi des Cryptomonnaies")
 default_tickers = ["BTC-USD", "ETH-USD", "SOL-USD"]
 
 # Barre de recherche
-user_input = st.text_input("🔍 Ajouter une crypto", placeholder="ex: XRP, Bitcoin...").lower().strip()
+user_input = st.text_input("🔍 Ajouter une crypto (TOP10 MC)", placeholder="ex: XRP, Bitcoin...").lower().strip()
 new_ticker = name_to_ticker.get(user_input)
 
 if new_ticker and new_ticker not in default_tickers:
@@ -96,7 +96,7 @@ afficher_indicateurs(selected_ticker, period, interval)
 st.markdown("---")
 st.subheader(f"💬 Analyse de sentiment - {selected_ticker}")
 with st.expander("📰 Actualités & Sentiment", expanded=True):
-    api_key = "e30e3507bcf14b97a836b42f10718586"
+    api_key = "9e39745475ef46afbfc0c3405fdaa57e"
     news_analyzer = NewsSentimentAnalyzer(api_key=api_key)
 
     search_term = selected_ticker.split("-")[0]
